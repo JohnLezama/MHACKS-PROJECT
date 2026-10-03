@@ -1,0 +1,18 @@
+[Unit]
+Description=Register optional first-boot Qwen GGUF with Ollama
+Requires=whiteboard-ollama.service
+After=whiteboard-ollama.service
+
+[Service]
+Type=oneshot
+User=whiteboard
+Group=whiteboard
+Environment=HOME=/data/whiteboardos
+Environment=OLLAMA_HOST=127.0.0.1:11434
+Environment=OLLAMA_MODELS=/data/whiteboardos/models
+ExecStart=/usr/libexec/whiteboard-model-import
+TimeoutStartSec=600
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

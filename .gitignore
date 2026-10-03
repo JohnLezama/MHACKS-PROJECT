@@ -1,0 +1,10 @@
+work/
+dist/
+settings/device.json
+assets/**/*.tar.*
+assets/**/*.gguf
+assets/ollama-runtime/bin/
+assets/ollama-runtime/lib/
+assets/ollama-models/blobs/
+assets/ollama-models/manifests/
+__pycache__/

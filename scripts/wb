@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+"""WhiteBoardOS command shell: fixed file tools, no model-controlled OS shell."""
+import argparse,json,urllib.request
+URL='http://127.0.0.1:8765'
+def request(path,data=None,token=None):
+ headers={'Content-Type':'application/json'}
+ if token:headers['X-WhiteBoard-Token']=token
+ r=urllib.request.Request(URL+path,data=None if data is None else json.dumps(data).encode(),headers=headers)
+ with urllib.request.urlopen(r,timeout=40) as f:return json.load(f)
+def main():
+ p=argparse.ArgumentParser(prog='wb');sub=p.add_subparsers(dest='command',required=True)
+ sub.add_parser('status');sub.add_parser('files');sub.add_parser('tasks')
+ find=sub.add_parser('find');find.add_argument('query');find.add_argument('--yesterday',action='store_true')
+ ask=sub.add_parser('ask');ask.add_argument('goal')
+ a=p.parse_args();status=request('/api/status')
+ if a.command=='files':value=status['files']
+ elif a.command=='status':value={k:status[k] for k in ('name','version','model','system','metadata_ready')}
+ elif a.command=='tasks':value=request('/api/tasks')
+ elif a.command=='find':
+  data={'query':a.query}
+  if a.yesterday:data.update(activity='human_view',time_range='yesterday')
+  value=request('/api/search',data,status['csrf'])
+ else:value=request('/api/task',{'goal':a.goal},status['csrf'])
+ print(json.dumps(value,indent=2))
+if __name__=='__main__':main()

@@ -1,0 +1,2 @@
+Project Atlas proposal. Version 2, dated 2026-10-01. Supersedes version 1.
+Budget: 750 dollars. Goal: classify hand gestures from two sensor channels.

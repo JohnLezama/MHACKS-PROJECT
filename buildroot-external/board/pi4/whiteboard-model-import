@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+if [ ! -f /data/whiteboardos/qwen-source.gguf ]; then exit 0;fi
+if [ -f /data/whiteboardos/.gguf-imported ]; then exit 0;fi
+/usr/bin/python3 - <<'CODE'
+import time,urllib.request
+for attempt in range(120):
+ try:
+  with urllib.request.urlopen('http://127.0.0.1:11434/api/tags',timeout=2):break
+ except OSError:time.sleep(1)
+else:raise SystemExit('Ollama did not start; inspect journalctl -u whiteboard-ollama')
+CODE
+/usr/bin/ollama create whiteboard-metadata:latest -f /data/whiteboardos/Modelfile.gguf
+touch /data/whiteboardos/.gguf-imported

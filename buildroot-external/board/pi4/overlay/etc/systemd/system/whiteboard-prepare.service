@@ -1,0 +1,12 @@
+[Unit]
+Description=Prepare WhiteBoardOS persistent state
+RequiresMountsFor=/data
+Before=whiteboardos.service whiteboard-ollama.service dropbear.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/whiteboard-prepare
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

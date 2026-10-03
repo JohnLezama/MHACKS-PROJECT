@@ -1,0 +1,5 @@
+NAME="WhiteBoardOS"
+ID=whiteboardos
+VERSION="0.3.0"
+VERSION_ID=0.3.0
+PRETTY_NAME="WhiteBoardOS 0.3 (Pi 4, headless)"

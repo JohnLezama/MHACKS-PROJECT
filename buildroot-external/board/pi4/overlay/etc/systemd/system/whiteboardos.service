@@ -1,0 +1,26 @@
+[Unit]
+Description=WhiteBoardOS interface and Gemini agent
+Requires=whiteboard-prepare.service
+After=whiteboard-prepare.service network.target
+Wants=whiteboard-ollama.service
+
+[Service]
+User=whiteboard
+Group=whiteboard
+WorkingDirectory=/opt/whiteboardos
+Environment=PYTHONPATH=/opt/whiteboardos
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -m whiteboardos.server --root /data/whiteboardos/documents --state /data/whiteboardos
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/data/whiteboardos
+
+[Install]
+WantedBy=multi-user.target

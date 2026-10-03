@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+mountpoint -q /data || { echo 'WhiteBoardOS data partition is not mounted' >&2;exit 1; }
+mkdir -p /data/whiteboardos/documents /data/whiteboardos/models /data/system/dropbear
+chown 1000:1000 /data/whiteboardos /data/whiteboardos/documents /data/whiteboardos/models
+chmod 700 /data/whiteboardos /data/system/dropbear
+if [ ! -f /data/whiteboardos/.demo-seeded ]; then
+ cp -a /opt/whiteboardos/demo/. /data/whiteboardos/documents/
+ touch /data/whiteboardos/.demo-seeded
+fi
+# Seeded model files are owned by root in the generated image; fix once on device.
+if [ ! -f /data/whiteboardos/.ownership-ready ]; then
+ chown -R 1000:1000 /data/whiteboardos
+ touch /data/whiteboardos/.ownership-ready
+fi
