@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Generate a deterministic WhiteBoardOS retrieval stress corpus.
+
+Creates only synthetic text/markdown/json files beneath StressTest/. It never runs
+unless explicitly invoked. A manifest records known relevant files for benchmark queries.
+"""
+import argparse
+import json
+import random
+import shutil
+from pathlib import Path
+
+ROOT=Path('/data/whiteboardos/documents/StressTest')
+TOPICS=[
+ ('embedded_audio',['microphone','I2S','Raspberry Pi','speech recognition','acoustic model','latency']),
+ ('chip_verification',['ECO','design verification','regression','testbench','waveform','RTL']),
+ ('organic_chemistry',['alkane','stereochemistry','nomenclature','reaction','isomer','functional group']),
+ ('transfer_strategy',['transfer application','Stanford','portfolio','awards','research','engineering story']),
+ ('robotics',['stepper motor','encoder','kinematics','controller','actuator','sensor']),
+ ('systems',['Buildroot','ARM64','systemd','ext4','QEMU','Linux']),
+ ('web_product',['frontend','API','deployment','authentication','database','UI']),
+ ('biology',['scaffold','collagen','tissue engineering','ligament','cell','biomaterial']),
+]
+NEEDLES={
+ 'mhacks_context':[
+  ('Archive/old_event_notes.md','Notes from an autumn hackathon demo. The WhiteBoardOS team should emphasize contextual computing, local semantic indexing, ARM64 boot, and a three-minute judging flow. The event is MHacks even though this file lives outside the project folder.'),
+  ('Research/contextual_computing.txt','Contextual-computing experiments for the MHacks WhiteBoardOS demonstration compare semantic retrieval with agents that recursively enumerate folders.'),
+  ('Misc/demo_timing.json',json.dumps({'event':'MHacks','project':'WhiteBoardOS','demo_seconds':180,'focus':['semantic retrieval','local metadata','graph relationships']})),
+ ],
+ 'local_speech':[
+  ('Archive/audio_board_notes.md','Bench notes for local speech recognition on a Raspberry Pi using an INMP441 I2S microphone. Small acoustic models can run on CPU without an AI accelerator.'),
+  ('Research/edge_inference_latency.txt','Measure end-to-end speech inference latency on a small ARM computer; microphone capture uses I2S and the model remains fully local.'),
+ ],
+ 'transfer_awards':[
+  ('Personal/portfolio_strategy.md','Transfer application strategy: connect engineering projects, hackathon results, research, and selective technical awards into one coherent Stanford narrative.'),
+  ('Archive/competition_targets.txt','Potential programming and engineering competition targets that could strengthen a transfer portfolio, prioritized by selectivity and technical signal.'),
+ ],
+}
+
+
+def synthetic_body(rng,i,topic,terms):
+    chosen=rng.sample(terms,k=min(4,len(terms)))
+    filler=['prototype','benchmark','notes','iteration','measurement','design','review','experiment','workflow','result']
+    return (f'# {topic.replace("_"," ").title()} note {i}\n\n'
+            f'This synthetic test file discusses {", ".join(chosen)}. '
+            f'The current {rng.choice(filler)} records a {rng.choice(filler)} for later comparison. '
+            f'It intentionally contains plausible technical language so retrieval must separate related concepts from decoys.\n')
+
+
+def main():
+    ap=argparse.ArgumentParser()
+    ap.add_argument('--files',type=int,default=500,help='Approximate number of decoy/background files, plus known needles.')
+    ap.add_argument('--seed',type=int,default=1337)
+    ap.add_argument('--clean',action='store_true',help='Delete the existing StressTest corpus and exit.')
+    args=ap.parse_args()
+    if args.clean:
+        shutil.rmtree(ROOT,ignore_errors=True)
+        print('Removed',ROOT);return
+    if args.files<8:ap.error('--files must be at least 8')
+    rng=random.Random(args.seed)
+    ROOT.mkdir(parents=True,exist_ok=True)
+    for child in ROOT.iterdir():
+        if child.is_dir():shutil.rmtree(child)
+        else:child.unlink()
+    manifest={'seed':args.seed,'background_files':args.files,'queries':{}}
+    for i in range(args.files):
+        topic,terms=TOPICS[i % len(TOPICS)]
+        folder=ROOT/topic/f'batch_{i//100:02d}'
+        folder.mkdir(parents=True,exist_ok=True)
+        ext='.md' if i%3 else '.txt'
+        path=folder/f'note_{i:04d}{ext}'
+        path.write_text(synthetic_body(rng,i,topic,terms),encoding='utf-8')
+    for label,items in NEEDLES.items():
+        rels=[]
+        for rel,body in items:
+            path=ROOT/rel;path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_text(body+'\n',encoding='utf-8');rels.append(str(path.relative_to(ROOT.parent)))
+        manifest['queries'][label]=rels
+    (ROOT/'ground_truth.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
+    total=sum(1 for p in ROOT.rglob('*') if p.is_file())
+    print(f'Created {total} files under {ROOT}')
+    print('Ground truth:',ROOT/'ground_truth.json')
+    print('Next: wb rebuild-retrieval --force')
+
+if __name__=='__main__':main()

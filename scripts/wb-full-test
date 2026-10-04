@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+"""One-command WhiteBoardOS end-to-end demo/test.
+
+The normal user prompt is passed through folder-aware semantic retrieval, graph
+expansion, Gemini reasoning, and safe WhiteBoardOS file actions. The embedding
+model is warmed only if retrieval detects that Ollama is not already ready.
+"""
+import os, subprocess, sys
+
+PROMPT = "Find everything relevant to the MHacks WhiteBoardOS demo, explain how the system works, summarize what we should show judges, and name the most important files."
+SCRIPT = "/opt/whiteboardos/benchmarks/gemini_retrieval_benchmark.py"
+
+prompt = " ".join(sys.argv[1:]).strip() or PROMPT
+print("WhiteBoardOS full-stack test")
+print("Prompt:", prompt)
+print("Pipeline: folder-aware semantic retrieval -> graph expansion -> compact context -> Gemini -> safe file actions when requested")
+print("Embedding policy: use resident all-minilm; warm and retry automatically only if retrieval falls back")
+cmd=[sys.executable,SCRIPT,"--prompt",prompt,"--label","whiteboard-full-stack-v2.7"]
+raise SystemExit(subprocess.call(cmd,env=os.environ.copy()))

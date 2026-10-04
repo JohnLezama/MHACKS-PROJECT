@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+import argparse, json, random, shutil
+from pathlib import Path
+ROOT=Path('/data/whiteboardos/documents/OrganizerTest')
+CATS={
+ 'MHacks':['demo','judge','sponsor','semantic index','whiteboardos','hackathon'],
+ 'EmbeddedAI':['raspberry pi','INMP441','speech recognition','I2S','local inference','microphone'],
+ 'Transfer':['stanford','transfer','awards','portfolio','research','application'],
+ 'Calculus':['series','convergence','sequence','integral','derivative','calculus'],
+ 'ChipDV':['ECO','verification','RTL','testbench','regression','waveform'],
+}
+
+def main():
+ ap=argparse.ArgumentParser();ap.add_argument('--files',type=int,default=80);ap.add_argument('--seed',type=int,default=2026);ap.add_argument('--clean',action='store_true');a=ap.parse_args()
+ if a.clean: shutil.rmtree(ROOT,ignore_errors=True);print('Removed',ROOT);return
+ rng=random.Random(a.seed);shutil.rmtree(ROOT,ignore_errors=True);ROOT.mkdir(parents=True)
+ truth={}
+ names=['notes','draft','ideas','final','v2','misc','outline','research','todo','summary']
+ for i in range(a.files):
+  cat=list(CATS)[i%len(CATS)];terms=CATS[cat];sub=rng.choice(['Downloads','Desktop','Inbox','Old','Temp','Unsorted'])
+  d=ROOT/sub;d.mkdir(parents=True,exist_ok=True)
+  ext=rng.choice(['.md','.txt','.json'])
+  name=f'{rng.choice(names)}_{i:03d}{ext}';p=d/name
+  body=f'{cat} material. ' + ', '.join(rng.sample(terms,k=4)) + f'. Synthetic organizer test document {i}.\n'
+  if ext=='.json': body=json.dumps({'category':cat,'notes':body})+'\n'
+  p.write_text(body,encoding='utf-8');truth[str(p.relative_to(ROOT.parent))]=cat
+ (ROOT/'ground_truth.json').write_text(json.dumps({'categories':truth},indent=2)+'\n')
+ print(f'Created {a.files} messy files under {ROOT}')
+ print('Ground truth:',ROOT/'ground_truth.json')
+ print('Next: wb rebuild-retrieval')
+if __name__=='__main__':main()

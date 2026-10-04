@@ -1,25 +1,93 @@
 #!/usr/bin/env python3
-"""WhiteBoardOS command shell: fixed file tools, no model-controlled OS shell."""
-import argparse,json,urllib.request
+"""WhiteBoardOS command shell for files, retrieval diagnostics, local OS status, and secrets."""
+import argparse
+import getpass
+import json
+import os
+from pathlib import Path
+import urllib.request
+import urllib.error
+
 URL='http://127.0.0.1:8765'
+GEMINI_KEY_FILE=Path(os.environ.get('WHITEBOARD_GEMINI_KEY_FILE','/data/whiteboardos/.secrets/gemini_api_key'))
+
+
 def request(path,data=None,token=None):
- headers={'Content-Type':'application/json'}
- if token:headers['X-WhiteBoard-Token']=token
- r=urllib.request.Request(URL+path,data=None if data is None else json.dumps(data).encode(),headers=headers)
- with urllib.request.urlopen(r,timeout=40) as f:return json.load(f)
+    headers={'Content-Type':'application/json'}
+    if token:headers['X-WhiteBoard-Token']=token
+    body=None if data is None else json.dumps(data).encode()
+    r=urllib.request.Request(URL+path,data=body,headers=headers)
+    try:
+        with urllib.request.urlopen(r,timeout=180) as f:return json.load(f)
+    except urllib.error.HTTPError as exc:
+        try: detail=exc.read().decode("utf-8","replace")
+        except Exception: detail=""
+        raise SystemExit("WhiteBoardOS API error %s: %s" % (exc.code,detail or exc.reason))
+
+
+def save_gemini_key(key):
+    GEMINI_KEY_FILE.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+    try:os.chmod(GEMINI_KEY_FILE.parent,0o700)
+    except OSError:pass
+    tmp=GEMINI_KEY_FILE.with_name(GEMINI_KEY_FILE.name+'.tmp')
+    fd=os.open(str(tmp),os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
+    try:
+        with os.fdopen(fd,'w',encoding='utf-8') as handle:
+            handle.write(key.strip()+'\n')
+            handle.flush();os.fsync(handle.fileno())
+        os.replace(tmp,GEMINI_KEY_FILE)
+        os.chmod(GEMINI_KEY_FILE,0o600)
+    finally:
+        try:tmp.unlink()
+        except FileNotFoundError:pass
+
+
+def gemini_key_command(action):
+    if action=='status':
+        configured=GEMINI_KEY_FILE.is_file() and bool(GEMINI_KEY_FILE.read_text(encoding='utf-8').strip())
+        return {'configured':configured,'path':str(GEMINI_KEY_FILE),'permissions':'0600' if configured else None}
+    if action=='clear':
+        try:GEMINI_KEY_FILE.unlink()
+        except FileNotFoundError:pass
+        return {'ok':True,'configured':False,'path':str(GEMINI_KEY_FILE)}
+    key=getpass.getpass('Gemini API key (hidden): ').strip()
+    if not key:raise SystemExit('Gemini API key cannot be empty')
+    save_gemini_key(key)
+    return {'ok':True,'configured':True,'path':str(GEMINI_KEY_FILE),'permissions':'0600'}
+
+
 def main():
- p=argparse.ArgumentParser(prog='wb');sub=p.add_subparsers(dest='command',required=True)
- sub.add_parser('status');sub.add_parser('files');sub.add_parser('tasks')
- find=sub.add_parser('find');find.add_argument('query');find.add_argument('--yesterday',action='store_true')
- ask=sub.add_parser('ask');ask.add_argument('goal')
- a=p.parse_args();status=request('/api/status')
- if a.command=='files':value=status['files']
- elif a.command=='status':value={k:status[k] for k in ('name','version','model','system','metadata_ready')}
- elif a.command=='tasks':value=request('/api/tasks')
- elif a.command=='find':
-  data={'query':a.query}
-  if a.yesterday:data.update(activity='human_view',time_range='yesterday')
-  value=request('/api/search',data,status['csrf'])
- else:value=request('/api/task',{'goal':a.goal},status['csrf'])
- print(json.dumps(value,indent=2))
+    p=argparse.ArgumentParser(prog='wb')
+    sub=p.add_subparsers(dest='command',required=True)
+    sub.add_parser('status')
+    sub.add_parser('files')
+    sub.add_parser('retrieval-status')
+    sub.add_parser('warm-retrieval')
+    sync=sub.add_parser('sync-status');sync.add_argument('--limit',type=int,default=20)
+    key=sub.add_parser('gemini-key');key.add_argument('action',choices=('set','status','clear'))
+    find=sub.add_parser('find');find.add_argument('query');find.add_argument('--yesterday',action='store_true')
+    retrieve=sub.add_parser('retrieve');retrieve.add_argument('query');retrieve.add_argument('--limit',type=int,default=0,help='0 = dynamic result count')
+    retrieve.add_argument('--debug',action='store_true');retrieve.add_argument('--excerpts',action='store_true')
+    rebuild=sub.add_parser('rebuild-retrieval');rebuild.add_argument('--force',action='store_true')
+    a=p.parse_args()
+    if a.command=='gemini-key':
+        value=gemini_key_command(a.action)
+        print(json.dumps(value,indent=2,ensure_ascii=False));return
+    status=request('/api/status')
+    if a.command=='files':value=status['files']
+    elif a.command=='status':value={k:status[k] for k in ('name','version','model','system','metadata_ready','retrieval')}
+    elif a.command=='retrieval-status':value=status['retrieval']
+    elif a.command=='warm-retrieval':value=request('/api/retrieval-warm',{},status['csrf'])
+    elif a.command=='sync-status':value=request('/api/sync-status',{'limit':a.limit},status['csrf'])
+    elif a.command=='find':
+        data={'query':a.query}
+        if a.yesterday:data.update(activity='human_view',time_range='yesterday')
+        value=request('/api/search',data,status['csrf'])
+    elif a.command=='retrieve':
+        value=request('/api/retrieve',{'query':a.query,'limit':a.limit,'debug':a.debug,
+                                      'include_excerpts':a.excerpts},status['csrf'])
+    else:
+        value=request('/api/retrieval-rebuild',{'limit':200,'force':a.force},status['csrf'])
+    print(json.dumps(value,indent=2,ensure_ascii=False))
+
 if __name__=='__main__':main()
