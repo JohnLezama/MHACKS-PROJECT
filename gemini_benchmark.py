@@ -104,7 +104,7 @@ def positive_int(value):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--prompt', help='Prompt to send (otherwise asks interactively)')
-    parser.add_argument('--model', default='gemini-2.5-flash', help='Model ID supported by your API key')
+    parser.add_argument('--model', default='gemini-3.8-flash', help='Model ID supported by your API key')
     parser.add_argument('--repeat', type=positive_int, default=1)
     parser.add_argument('--timeout', type=positive_int, default=90)
     parser.add_argument('--max-output-tokens', type=positive_int, default=2048)
